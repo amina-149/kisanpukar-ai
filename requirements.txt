@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+openai
+twilio
+python-dotenv
+requests
+pillow
+qrcode
+aiohttp
+python-multipart
+httpx

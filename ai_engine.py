@@ -62,14 +62,21 @@ async def analyze_image(image_url: str) -> str:
 
     try:
         # Image download with Twilio auth
-        async with httpx.AsyncClient(timeout=30) as http:
+        async with httpx.AsyncClient(
+            timeout=60,
+            follow_redirects=True
+        ) as http:
             img = await http.get(
                 image_url,
                 auth=(
                     os.getenv("TWILIO_ACCOUNT_SID"),
                     os.getenv("TWILIO_AUTH_TOKEN")
-                )
+                ),
+                headers={"User-Agent": "KisanPukarAI/1.0"}
             )
+        
+        if img.status_code != 200:
+            return "🌾 *کسان پکار AI*\n\nتصویر نہیں مل سکی۔ دوبارہ بھیجیں۔"
 
         img_b64 = base64.b64encode(img.content).decode()
 
@@ -118,14 +125,21 @@ async def handle_voice(audio_url: str) -> str:
 
     try:
         # Audio download with Twilio auth
-        async with httpx.AsyncClient(timeout=30) as http:
+        async with httpx.AsyncClient(
+            timeout=60,
+            follow_redirects=True
+        ) as http:
             audio = await http.get(
                 audio_url,
                 auth=(
                     os.getenv("TWILIO_ACCOUNT_SID"),
                     os.getenv("TWILIO_AUTH_TOKEN")
-                )
+                ),
+                headers={"User-Agent": "KisanPukarAI/1.0"}
             )
+        
+        if audio.status_code != 200:
+            return "🌾 *کسان پکار AI*\n\nآواز نہیں مل سکی۔ دوبارہ بھیجیں۔"
 
         # Temp file mein save karo
         with tempfile.NamedTemporaryFile(

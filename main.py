@@ -116,7 +116,19 @@ async def test_webhook(phone: str, message: str):
         import traceback
         print(f"[TEST-ERROR] {e}")
         print(traceback.format_exc())
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return JSONResponse(content={"error": str(e), "trace": traceback.format_exc()}, status_code=500)
+
+
+@app.get("/test-gemini/{message}")
+async def test_gemini(message: str):
+    """Test Gemini directly without Airtable"""
+    try:
+        print(f"[GEMINI-TEST] Testing message: {message}")
+        reply = await ai_engine.chat_urdu(message, "test-user", "ٹیسٹ یوزر")
+        return JSONResponse(content={"success": True, "reply": reply})
+    except Exception as e:
+        import traceback
+        return JSONResponse(content={"error": str(e), "trace": traceback.format_exc()}, status_code=500)
 
 
 # ══════════════════════════════════════════════

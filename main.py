@@ -1,29 +1,39 @@
-from fastapi import FastAPI, Form
+from fastapi import FastAPI, Form, Request
 from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 from twilio.rest import Client
-import os
+import os, requests as req
 from dotenv import load_dotenv
+from datetime import datetime
 import ai_engine, database, registration
 
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(title="KisanPukar AI", version="3.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 TWILIO_SID    = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_TOKEN  = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_NUMBER = os.getenv("TWILIO_NUMBER")
+AT_TOKEN      = os.getenv("AIRTABLE_TOKEN")
+AT_BASE       = os.getenv("AIRTABLE_BASE_ID")
+AT_HEADERS    = lambda: {"Authorization": f"Bearer {AT_TOKEN}", "Content-Type": "application/json"}
 
 
 def send_whatsapp(to: str, message: str):
     client = Client(TWILIO_SID, TWILIO_TOKEN)
-    client.messages.create(
-        from_=TWILIO_NUMBER,
-        to=f"whatsapp:{to}",
-        body=message
-    )
+    client.messages.create(from_=TWILIO_NUMBER, to=f"whatsapp:{to}", body=message)
 
 
-# ── Webhook ───────────────────────────────────────────────
+# ══════════════════════════════════════════════
+# WEBHOOK
+# ══════════════════════════════════════════════
 
 @app.post("/webhook")
 async def webhook(
@@ -32,12 +42,10 @@ async def webhook(
     MediaUrl0: str = Form(default=None),
     MediaContentType0: str = Form(default=None)
 ):
-    phone = From.replace("whatsapp:", "")
-    reply = ""
+    phone    = From.replace("whatsapp:", "")
+    reply    = ""
     msg_type = "text"
-
     try:
-        # ── Registration check ──
         if not database.is_registered(phone):
             reg_reply = await registration.handle_registration(Body, phone)
             if reg_reply:
@@ -45,183 +53,262 @@ async def webhook(
                 send_whatsapp(phone, reg_reply)
                 return JSONResponse(content={"status": "ok"})
 
-        # ── Image — disease detection ──
         if MediaUrl0 and MediaContentType0 and "image" in MediaContentType0:
             msg_type = "image"
             reply = await ai_engine.analyze_image(MediaUrl0)
-
-        # ── Voice message ──
         elif MediaUrl0 and MediaContentType0 and "audio" in MediaContentType0:
             msg_type = "voice"
             reply = await ai_engine.handle_voice(MediaUrl0)
-
-        # ── Text ──
         else:
             msg_type = "text"
-            user = database.get_user(phone)
-            name = user.get("fields", {}).get("name", "") if user else ""
-            reply = await ai_engine.chat_urdu(Body, phone, name)
-
+            user   = database.get_user(phone)
+            name   = user.get("fields", {}).get("Name", "") if user else ""
+            reply  = await ai_engine.chat_urdu(Body, phone, name)
     except Exception as e:
         reply = "🌾 *کسان پکار AI*\n\nمعذرت، کوئی مسئلہ آ گیا۔ دوبارہ کوشش کریں۔"
-        print(f"Error: {e}")
+        print(f"Webhook error: {e}")
 
     database.save_message(phone, msg_type, Body or "media", reply)
     send_whatsapp(phone, reply)
     return JSONResponse(content={"status": "ok"})
 
 
-# ── Admin Dashboard ───────────────────────────────────────
+# ══════════════════════════════════════════════
+# API — STATS
+# ══════════════════════════════════════════════
+
+@app.get("/api/stats")
+async def api_stats():
+    try:
+        return JSONResponse(content=database.get_dashboard_stats())
+    except Exception as e:
+        return JSONResponse(content={"error": str(e), "total_users": 0,
+            "registered_users": 0, "total_messages": 0,
+            "region_breakdown": {}, "crop_breakdown": {},
+            "message_types": {"text": 0, "image": 0, "voice": 0}})
+
+
+# ══════════════════════════════════════════════
+# API — FARMERS
+# ══════════════════════════════════════════════
+
+@app.get("/api/farmers")
+async def api_farmers(limit: int = 100):
+    try:
+        r = req.get(
+            f"https://api.airtable.com/v0/{AT_BASE}/users",
+            headers=AT_HEADERS(),
+            params={"maxRecords": limit,
+                    "sort[0][field]": "Created At",
+                    "sort[0][direction]": "desc"}
+        )
+        records = r.json().get("records", [])
+        farmers = [{
+            "id":         rec.get("id"),
+            "name":       rec["fields"].get("Name", "نامعلوم"),
+            "phone":      rec["fields"].get("Phone", ""),
+            "region":     rec["fields"].get("Region", ""),
+            "language":   rec["fields"].get("Language", "urdu"),
+            "crop":       rec["fields"].get("crop_type", ""),
+            "acres":      rec["fields"].get("land_acres", 0),
+            "registered": rec["fields"].get("registered", False),
+            "created_at": rec["fields"].get("Created At", "")
+        } for rec in records]
+        return JSONResponse(content={"farmers": farmers, "total": len(farmers)})
+    except Exception as e:
+        return JSONResponse(content={"farmers": [], "total": 0, "error": str(e)})
+
+
+# ══════════════════════════════════════════════
+# API — MESSAGES
+# ══════════════════════════════════════════════
+
+@app.get("/api/messages")
+async def api_messages(limit: int = 50):
+    try:
+        r = req.get(
+            f"https://api.airtable.com/v0/{AT_BASE}/Messages",
+            headers=AT_HEADERS(),
+            params={"maxRecords": limit,
+                    "sort[0][field]": "created_at",
+                    "sort[0][direction]": "desc"}
+        )
+        records = r.json().get("records", [])
+        msgs = [{
+            "phone":      f.get("fields", {}).get("phone_number", ""),
+            "type":       f.get("fields", {}).get("message_type", "text"),
+            "user_msg":   f.get("fields", {}).get("user_message", "")[:120],
+            "bot_reply":  f.get("fields", {}).get("bot_reply", "")[:120],
+            "created_at": f.get("fields", {}).get("created_at", "")
+        } for f in records]
+        return JSONResponse(content={"messages": msgs, "total": len(msgs)})
+    except Exception as e:
+        return JSONResponse(content={"messages": [], "total": 0, "error": str(e)})
+
+
+# ══════════════════════════════════════════════
+# API — BROADCAST
+# ══════════════════════════════════════════════
+
+@app.post("/api/broadcast")
+async def api_broadcast(request: Request):
+    try:
+        body    = await request.json()
+        message = body.get("message", "")
+        region  = body.get("region", "all")
+        crop    = body.get("crop", "all")
+        if not message:
+            return JSONResponse(content={"error": "Message required"}, status_code=400)
+
+        formula = "{registered}=1"
+        r = req.get(
+            f"https://api.airtable.com/v0/{AT_BASE}/users",
+            headers=AT_HEADERS(),
+            params={"filterByFormula": formula, "fields[]": ["Phone", "Region", "crop_type"]}
+        )
+        records = r.json().get("records", [])
+        sent = failed = 0
+        for rec in records:
+            f     = rec.get("fields", {})
+            phone = f.get("Phone", "")
+            if not phone: continue
+            if region != "all" and f.get("Region", "") != region: continue
+            if crop   != "all" and f.get("crop_type", "") != crop: continue
+            try:
+                send_whatsapp(phone, message)
+                sent += 1
+            except Exception as e:
+                failed += 1
+                print(f"Broadcast fail {phone}: {e}")
+
+        return JSONResponse(content={
+            "sent": sent, "failed": failed,
+            "message": f"✅ {sent} کسانوں کو پیغام بھیجا گیا"
+        })
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+# ══════════════════════════════════════════════
+# API — COMPANIES
+# ══════════════════════════════════════════════
+
+@app.get("/api/companies")
+async def api_companies():
+    try:
+        r = req.get(
+            f"https://api.airtable.com/v0/{AT_BASE}/Companies",
+            headers=AT_HEADERS()
+        )
+        records = r.json().get("records", [])
+        companies = [{
+            "id":       rec.get("id"),
+            "name":     rec["fields"].get("company_name", ""),
+            "type":     rec["fields"].get("company_type", ""),
+            "contact":  rec["fields"].get("contact", ""),
+            "region":   rec["fields"].get("region", ""),
+            "products": rec["fields"].get("products", ""),
+            "plan":     rec["fields"].get("plan", "free"),
+            "active":   rec["fields"].get("active", False)
+        } for rec in records]
+        return JSONResponse(content={"companies": companies, "total": len(companies)})
+    except Exception as e:
+        return JSONResponse(content={"companies": [], "total": 0})
+
+
+@app.post("/api/companies")
+async def add_company(request: Request):
+    try:
+        body = await request.json()
+        payload = {"records": [{"fields": {
+            "company_name": body.get("name", ""),
+            "company_type": body.get("type", ""),
+            "contact":      body.get("contact", ""),
+            "region":       body.get("region", ""),
+            "products":     body.get("products", ""),
+            "plan":         body.get("plan", "free"),
+            "active":       True,
+            "created_at":   datetime.now().isoformat()
+        }}]}
+        r = req.post(
+            f"https://api.airtable.com/v0/{AT_BASE}/Companies",
+            headers=AT_HEADERS(),
+            json=payload
+        )
+        return JSONResponse(content={"success": True, "record": r.json()})
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+# ══════════════════════════════════════════════
+# API — MARKET RATES
+# ══════════════════════════════════════════════
+
+@app.get("/api/market-rates")
+async def api_market_rates():
+    return JSONResponse(content={
+        "updated_at": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "rates": {
+            "اناج": [
+                {"name": "گندم",  "min": 3800, "max": 4200, "unit": "من",  "trend": "up"},
+                {"name": "مکئی", "min": 2800, "max": 3200, "unit": "من",  "trend": "stable"},
+                {"name": "چاول", "min": 3500, "max": 4000, "unit": "من",  "trend": "up"},
+            ],
+            "سبزیاں": [
+                {"name": "ٹماٹر", "min": 80,  "max": 120, "unit": "کلو", "trend": "up"},
+                {"name": "آلو",   "min": 45,  "max": 65,  "unit": "کلو", "trend": "down"},
+                {"name": "پیاز",  "min": 55,  "max": 80,  "unit": "کلو", "trend": "stable"},
+                {"name": "مرچ",   "min": 100, "max": 200, "unit": "کلو", "trend": "up"},
+            ],
+            "پھل": [
+                {"name": "سیب",  "min": 150, "max": 250, "unit": "کلو", "trend": "up"},
+                {"name": "آم",   "min": 120, "max": 200, "unit": "کلو", "trend": "stable"},
+                {"name": "آڑو",  "min": 100, "max": 180, "unit": "کلو", "trend": "up"},
+            ]
+        }
+    })
+
+
+# ══════════════════════════════════════════════
+# API — HEALTH CHECK
+# ══════════════════════════════════════════════
+
+@app.get("/api/health")
+async def health():
+    return JSONResponse(content={
+        "status": "online",
+        "version": "3.0.0",
+        "checks": {
+            "api":      True,
+            "airtable": bool(AT_TOKEN),
+            "openai":   bool(os.getenv("OPENAI_API_KEY")),
+            "gemini":   bool(os.getenv("GEMINI_API_KEY")),
+            "twilio":   bool(TWILIO_SID),
+            "weather":  bool(os.getenv("WEATHER_API_KEY")),
+        },
+        "timestamp": datetime.now().isoformat()
+    })
+
+
+# ══════════════════════════════════════════════
+# ADMIN DASHBOARD
+# ══════════════════════════════════════════════
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard():
     try:
-        s = database.get_dashboard_stats()
-    except Exception as e:
-        print(f"Dashboard error: {e}")
-        s = {
-            "total_users": 0, "registered_users": 0,
-            "total_messages": 0, "top_city": "N/A", "top_crop": "N/A",
-            "city_breakdown": {}, "crop_breakdown": {},
-            "message_types": {"text": 0, "image": 0, "voice": 0}
-        }
-
-    city_rows = "".join(
-        f"<tr><td>{city}</td><td><b>{count}</b></td></tr>"
-        for city, count in s["city_breakdown"].items()
-    ) or "<tr><td colspan='2' style='color:#999'>ابھی ڈیٹا نہیں</td></tr>"
-
-    crop_rows = "".join(
-        f"<tr><td>{crop}</td><td><b>{count}</b></td></tr>"
-        for crop, count in s["crop_breakdown"].items()
-    ) or "<tr><td colspan='2' style='color:#999'>ابھی ڈیٹا نہیں</td></tr>"
-
-    return f"""<!DOCTYPE html>
-<html dir="rtl" lang="ur">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>کسان پکار AI — ایڈمن</title>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Segoe UI',Arial,sans-serif;background:#f1f8f1;color:#1a1a1a}}
-.header{{background:linear-gradient(135deg,#1B5E20,#388E3C);color:white;padding:22px 32px;
-         display:flex;align-items:center;justify-content:space-between;
-         box-shadow:0 3px 12px rgba(0,0,0,.2)}}
-.header h1{{font-size:1.7em;margin-bottom:4px}}
-.header p{{font-size:.85em;opacity:.85}}
-.live{{display:inline-block;width:9px;height:9px;background:#69f0ae;
-       border-radius:50%;animation:pulse 1.5s infinite;margin-right:6px}}
-@keyframes pulse{{0%,100%{{opacity:1}}50%{{opacity:.3}}}}
-.wrap{{max-width:1100px;margin:28px auto;padding:0 18px}}
-.kpi{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;margin-bottom:24px}}
-.kpi-card{{background:white;border-radius:14px;padding:22px;text-align:center;
-           box-shadow:0 2px 8px rgba(0,0,0,.07);border-top:4px solid #2E7D32}}
-.kpi-icon{{font-size:2em;margin-bottom:8px}}
-.kpi-num{{font-size:2.4em;font-weight:700;color:#1B5E20}}
-.kpi-lbl{{color:#777;font-size:.9em;margin-top:6px}}
-.row2{{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}}
-@media(max-width:640px){{.row2{{grid-template-columns:1fr}}}}
-.card{{background:white;border-radius:14px;padding:22px;box-shadow:0 2px 8px rgba(0,0,0,.07)}}
-.card h3{{color:#1B5E20;font-size:1em;margin-bottom:14px;padding-bottom:10px;
-          border-bottom:2px solid #e8f5e9}}
-table{{width:100%;border-collapse:collapse}}
-td,th{{padding:9px 12px;text-align:right;border-bottom:1px solid #f5f5f5}}
-th{{background:#e8f5e9;color:#2E7D32;font-size:.9em}}
-.msg-row{{display:flex;gap:14px;flex-wrap:wrap}}
-.msg-box{{flex:1;min-width:90px;border-radius:10px;padding:16px;text-align:center}}
-.msg-n{{font-size:1.9em;font-weight:700}}
-.footer{{text-align:center;padding:20px;color:#aaa;font-size:.8em}}
-</style>
-</head>
-<body>
-
-<div class="header">
-  <div>
-    <h1>🌾 کسان پکار AI</h1>
-    <p><span class="live"></span>ایڈمن ڈیش بورڈ — پاکستانی کسانوں کا ڈیجیٹل ساتھی</p>
-  </div>
-  <span style="font-size:2.2em">🇵🇰</span>
-</div>
-
-<div class="wrap">
-
-  <div class="kpi">
-    <div class="kpi-card">
-      <div class="kpi-icon">👨‍🌾</div>
-      <div class="kpi-num">{s['total_users']}</div>
-      <div class="kpi-lbl">کل صارفین</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">✅</div>
-      <div class="kpi-num">{s['registered_users']}</div>
-      <div class="kpi-lbl">رجسٹرڈ کسان</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">💬</div>
-      <div class="kpi-num">{s['total_messages']}</div>
-      <div class="kpi-lbl">کل پیغامات</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">📍</div>
-      <div class="kpi-num" style="font-size:1.4em">{s['top_city']}</div>
-      <div class="kpi-lbl">سرفہرست شہر</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">🌾</div>
-      <div class="kpi-num" style="font-size:1.4em">{s['top_crop']}</div>
-      <div class="kpi-lbl">مقبول ترین فصل</div>
-    </div>
-  </div>
-
-  <!-- Message Types -->
-  <div class="card" style="margin-bottom:20px">
-    <h3>📊 پیغامات کی اقسام</h3>
-    <div class="msg-row">
-      <div class="msg-box" style="background:#e3f2fd">
-        <div class="msg-n" style="color:#1565c0">{s['message_types'].get('text',0)}</div>
-        <div>💬 متن</div>
-      </div>
-      <div class="msg-box" style="background:#f3e5f5">
-        <div class="msg-n" style="color:#6a1b9a">{s['message_types'].get('image',0)}</div>
-        <div>📸 تصویر</div>
-      </div>
-      <div class="msg-box" style="background:#fff3e0">
-        <div class="msg-n" style="color:#e65100">{s['message_types'].get('voice',0)}</div>
-        <div>🎤 آواز</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="row2">
-    <div class="card">
-      <h3>📍 شہر کے مطابق کسان</h3>
-      <table>
-        <tr><th>شہر</th><th>تعداد</th></tr>
-        {city_rows}
-      </table>
-    </div>
-    <div class="card">
-      <h3>🌾 فصل کے مطابق کسان</h3>
-      <table>
-        <tr><th>فصل</th><th>تعداد</th></tr>
-        {crop_rows}
-      </table>
-    </div>
-  </div>
-
-</div>
-
-<div class="footer">کسان پکار AI — پاکستانی کسان کا ڈیجیٹل ساتھی 🇵🇰 | © 2026</div>
-<script>setTimeout(()=>location.reload(),30000)</script>
-</body>
-</html>"""
+        with open("admin_dashboard.html", "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        return HTMLResponse(content="<h1>admin_dashboard.html not found — please upload it</h1>")
 
 
 @app.get("/")
 def root():
     return {
-        "status": "KisanPukar AI چل رہا ہے! 🌾",
-        "version": "2.0.0",
-        "dashboard": "/admin"
+        "status": "🌾 KisanPukar AI چل رہا ہے!",
+        "version": "3.0.0",
+        "dashboard": "/admin",
+        "api_docs": "/docs",
+        "health": "/api/health"
     }

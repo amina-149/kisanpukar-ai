@@ -3,6 +3,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from datetime import datetime
 import google.generativeai as genai
+import market
 
 load_dotenv()
 

@@ -13,9 +13,10 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-# ⚠️ Tumhare existing table names yahan hain
-USERS_URL    = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/Users"
-MESSAGES_URL = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/Messages"
+# ⚠️ Table URLs
+USERS_URL     = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/Users"
+MESSAGES_URL  = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/Messages"
+COMPANIES_URL = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/Companies"
 
 
 # ─── USER FUNCTIONS ───────────────────────────────────────
@@ -81,6 +82,31 @@ def save_message(phone: str, msg_type: str, user_msg: str, bot_reply: str):
         requests.post(MESSAGES_URL, headers=HEADERS, json=payload)
     except Exception as e:
         print(f"Message save error: {e}")
+
+
+# ─── COMPANIES FUNCTIONS ──────────────────────────────────
+
+def get_companies(limit: int = 100):
+    """Sab companies dhundo"""
+    params = {"maxRecords": limit}
+    r = requests.get(COMPANIES_URL, headers=HEADERS, params=params)
+    return r.json().get("records", [])
+
+
+def create_company(name: str, company_type: str, contact: str, region: str, products: str, plan: str):
+    """Nai company add karo"""
+    payload = {"records": [{"fields": {
+        "company_name": name,
+        "company_type": company_type,
+        "contact":      contact,
+        "region":       region,
+        "products":     products,
+        "plan":         plan,
+        "active":       True,
+        "created_at":   datetime.now().isoformat()
+    }}]}
+    r = requests.post(COMPANIES_URL, headers=HEADERS, json=payload)
+    return r.json()
 
 
 # ─── DASHBOARD STATS ──────────────────────────────────────

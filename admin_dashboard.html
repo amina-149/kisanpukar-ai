@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>کسان پکار AI — ایڈمن پینل</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;600;700&family=Space+Mono:wght@400;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --g1:#071a07; --g2:#0c2e0c; --g3:#163d16; --g4:#1e5c1e;
+  --acc:#2ecc40; --acc2:#4eff6a; --acc-dim:rgba(46,204,64,.12);
+  --gold:#f5c842; --red:#ff4757; --blue:#3b9eff; --purple:#a855f7;
+  --txt:#dff0df; --txt2:#8ab88a; --txt3:#4e714e;
+  --card:rgba(12,46,12,.7); --border:rgba(46,204,64,.13);
+  --hover:rgba(46,204,64,.07);
+  --sidebar-w:220px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--g1);color:var(--txt);min-height:100vh;display:flex}
+body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 70% 60% at 30% 20%,rgba(46,204,64,.04) 0%,transparent 70%);pointer-events:none;z-index:0}
+
+/* ── SIDEBAR ── */
+.sb{width:var(--sidebar-w);min-height:100vh;background:rgba(5,15,5,.97);border-left:1px solid var(--border);display:flex;flex-direction:column;position:fixed;right:0;top:0;z-index:200}
+.sb-logo{padding:22px 18px 18px;border-bottom:1px solid var(--border)}
+.sb-logo span{font-size:2em;display:block}
+.sb-logo h1{font-family:'Noto Nastaliq Urdu',serif;font-size:1em;color:var(--acc);margin:6px 0 2px}
+.sb-logo p{font-family:'Space Mono',monospace;font-size:.6em;color:var(--txt3);letter-spacing:.05em}
+.nav{flex:1;padding:14px 10px;display:flex;flex-direction:column;gap:2px}
+.ni{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;cursor:pointer;transition:.2s;border:1px solid transparent;font-size:.82em;color:var(--txt2);font-family:'Noto Nastaliq Urdu',serif}
+.ni:hover{background:var(--hover);color:var(--txt);border-color:var(--border)}
+.ni.active{background:var(--acc-dim);color:var(--acc);border-color:rgba(46,204,64,.25);font-weight:600}
+.ni .ic{font-size:1.1em;flex-shrink:0;width:20px;text-align:center}
+.sb-foot{padding:14px;border-top:1px solid var(--border)}
+.live-row{display:flex;align-items:center;gap:7px;font-family:'Space Mono',monospace;font-size:.65em;color:var(--txt3)}
+.ldot{width:7px;height:7px;background:var(--acc);border-radius:50%;animation:ldot 2s infinite;box-shadow:0 0 5px var(--acc)}
+@keyframes ldot{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── MAIN ── */
+.main{margin-right:var(--sidebar-w);flex:1;padding:28px 28px 40px;position:relative;z-index:1;max-width:calc(100vw - var(--sidebar-w))}
+
+/* ── SECTIONS ── */
+.section{display:none}
+.section.active{display:block}
+
+/* ── TOPBAR ── */
+.topbar{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;gap:12px;flex-wrap:wrap}
+.page-h h2{font-family:'Noto Nastaliq Urdu',serif;font-size:1.35em}
+.page-h p{font-family:'Space Mono',monospace;font-size:.65em;color:var(--txt3);margin-top:3px}
+.tb-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dbadge{background:var(--card);border:1px solid var(--border);padding:7px 12px;border-radius:7px;font-family:'Space Mono',monospace;font-size:.68em;color:var(--txt2)}
+.btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:.78em;font-family:'DM Sans',sans-serif;transition:.2s;display:flex;align-items:center;gap:5px}
+.btn-p{background:var(--acc);color:var(--g1);font-weight:700}
+.btn-p:hover{background:var(--acc2);transform:translateY(-1px)}
+.btn-g{background:var(--card);color:var(--txt2);border:1px solid var(--border)}
+.btn-g:hover{background:var(--hover);color:var(--txt)}
+
+/* ── KPI ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}
+.kc{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 16px;position:relative;overflow:hidden;transition:.25s;cursor:default}
+.kc:hover{border-color:rgba(46,204,64,.28);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.kc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0}
+.kc.g::before{background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.kc.gold::before{background:linear-gradient(90deg,var(--gold),#ffe870)}
+.kc.b::before{background:linear-gradient(90deg,var(--blue),#90d0ff)}
+.kc.p::before{background:linear-gradient(90deg,var(--purple),#d8a4ff)}
+.kc.r::before{background:linear-gradient(90deg,var(--red),#ff8f80)}
+.kc-icon{position:absolute;top:14px;left:14px;font-size:1.7em;opacity:.12}
+.kc-lbl{font-family:'Noto Nastaliq Urdu',serif;font-size:.68em;color:var(--txt3);margin-bottom:6px}
+.kc-val{font-family:'Space Mono',monospace;font-size:1.9em;font-weight:700;line-height:1;margin-bottom:5px}
+.kc.g .kc-val{color:var(--acc)}
+.kc.gold .kc-val{color:var(--gold)}
+.kc.b .kc-val{color:var(--blue)}
+.kc.p .kc-val{color:var(--purple)}
+.kc.r .kc-val{color:var(--red)}
+.kc-trend{font-size:.65em;font-family:'Space Mono',monospace;color:var(--txt3)}
+
+/* ── TICKER ── */
+.ticker-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:18px;overflow:hidden}
+.ticker-label{font-family:'Space Mono',monospace;font-size:.6em;color:var(--txt3);margin-bottom:7px}
+.ticker-track{display:flex;gap:36px;animation:tick 22s linear infinite;width:max-content}
+.ticker-track:hover{animation-play-state:paused}
+@keyframes tick{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.ti{display:flex;align-items:center;gap:7px;white-space:nowrap;font-family:'Space Mono',monospace;font-size:.75em}
+.ti .cn{color:var(--txt3)} .ti .cp{color:var(--acc);font-weight:700}
+.ti .cu{color:var(--acc)} .ti .cd{color:var(--red)}
+
+/* ── GRID ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+.g3{display:grid;grid-template-columns:2fr 1fr;gap:18px;margin-bottom:18px}
+
+/* ── CARD ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;backdrop-filter:blur(8px)}
+.card-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-h h3{font-family:'Noto Nastaliq Urdu',serif;font-size:.88em;color:var(--txt);display:flex;align-items:center;gap:7px}
+
+/* ── TABLE ── */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{padding:9px 12px;text-align:right;font-size:.68em;color:var(--txt3);font-family:'Space Mono',monospace;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em}
+td{padding:11px 12px;text-align:right;font-size:.8em;border-bottom:1px solid rgba(46,204,64,.04);color:var(--txt2)}
+tr:hover td{background:var(--hover);color:var(--txt)}
+
+/* ── LOADING ── */
+.loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--txt3);font-family:'Space Mono',monospace;font-size:.75em}
+.spin{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--acc);border-radius:50%;animation:spin .8s linear infinite;margin-left:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── RESPONSIVE ── */
+@media(max-width:800px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.g2,.g3{grid-template-columns:1fr}.sb{display:none}.main{margin-right:0}}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sb">
+  <div class="sb-logo">
+    <span>🌾</span>
+    <h1>کسان پکار AI</h1>
+    <p>ADMIN PANEL v3.0</p>
+  </div>
+  <nav class="nav">
+    <div class="ni active" onclick="showSection('dashboard',this)">
+      <span class="ic">📊</span><span>ڈیش بورڈ</span>
+    </div>
+    <div class="ni" onclick="showSection('farmers',this)">
+      <span class="ic">👨‍🌾</span><span>کسان</span>
+    </div>
+    <div class="ni" onclick="showSection('messages',this)">
+      <span class="ic">💬</span><span>پیغامات</span>
+    </div>
+    <div class="ni" onclick="showSection('market',this)">
+      <span class="ic">📊</span><span>منڈی ریٹ</span>
+    </div>
+    <div class="ni" onclick="showSection('broadcast',this)">
+      <span class="ic">📣</span><span>براڈکاسٹ</span>
+    </div>
+    <div class="ni" onclick="showSection('companies',this)">
+      <span class="ic">🏭</span><span>کمپنیاں</span>
+    </div>
+    <div class="ni" onclick="showSection('health',this)">
+      <span class="ic">⚡</span><span>سسٹم حالت</span>
+    </div>
+  </nav>
+  <div class="sb-foot">
+    <div class="live-row"><div class="ldot"></div><span id="sysStatus">LOADING...</span></div>
+    <div style="font-family:'Space Mono',monospace;font-size:.58em;color:var(--txt3);margin-top:4px" id="lastUpdate">--</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+<!-- ══ DASHBOARD ══════════════════════════════ -->
+<div class="section active" id="sec-dashboard">
+  <div class="topbar">
+    <div class="page-h"><h2>ڈیش بورڈ — تجزیہ</h2><p>LIVE ANALYTICS</p></div>
+    <div class="tb-right">
+      <div class="dbadge" id="topbar-date">--</div>
+      <button class="btn btn-g" onclick="loadAll()">🔄 ریفریش</button>
+      <button class="btn btn-p" onclick="showSection('broadcast',document.querySelectorAll('.ni')[4])">📣 براڈکاسٹ</button>
+    </div>
+  </div>
+
+  <!-- Ticker -->
+  <div class="ticker-card">
+    <div class="ticker-label">LIVE MANDI RATES — پشاور منڈی</div>
+    <div class="ticker-track" id="ticker"></div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid" id="kpiGrid">
+    <div class="kc g"><span class="kc-icon">👨‍🌾</span><div class="kc-lbl">کل کسان</div><div class="kc-val" id="k-total">—</div><div class="kc-trend">رجسٹریشن</div></div>
+    <div class="kc gold"><span class="kc-icon">✅</span><div class="kc-lbl">رجسٹرڈ</div><div class="kc-val" id="k-reg">—</div><div class="kc-trend">مکمل پروفائل</div></div>
+    <div class="kc b"><span class="kc-icon">💬</span><div class="kc-lbl">کل پیغامات</div><div class="kc-val" id="k-msg">—</div><div class="kc-trend">تمام اقسام</div></div>
+    <div class="kc p"><span class="kc-icon">📸</span><div class="kc-lbl">تصویر تجزیہ</div><div class="kc-val" id="k-img">—</div><div class="kc-trend">بیماری تشخیص</div></div>
+    <div class="kc r"><span class="kc-icon">🎤</span><div class="kc-lbl">آواز پیغام</div><div class="kc-val" id="k-voice">—</div><div class="kc-trend">Whisper AI</div></div>
+  </div>
+
+  <!-- Market Rates -->
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-h"><h3>📊 منڈی ریٹ</h3></div>
+    <div class="tw">
+      <table id="marketTable">
+        <thead><tr><th>فصل</th><th>کم</th><th>زیادہ</th><th>رجحان</th></tr></thead>
+        <tbody><tr><td colspan="4"><div class="loading">لوڈ ہو رہا ہے<div class="spin"></div></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ FARMERS ══════════════════════════════════ -->
+<div class="section" id="sec-farmers">
+  <div class="topbar">
+    <div class="page-h"><h2>👨‍🌾 رجسٹرڈ کسان</h2><p>FARMER DATABASE</p></div>
+    <div class="tb-right">
+      <div class="dbadge" id="farmerCount">— کسان</div>
+      <button class="btn btn-g" onclick="loadFarmers()">🔄 ریفریش</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>نام</th><th>فون</th><th>علاقہ</th><th>فصل</th><th>ایکڑ</th><th>تاریخ</th>
+        </tr></thead>
+        <tbody id="farmersTable"><tr><td colspan="6"><div class="loading">لوڈ ہو رہا ہے<div class="spin"></div></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MESSAGES ════════════════════════════════ -->
+<div class="section" id="sec-messages">
+  <div class="topbar">
+    <div class="page-h"><h2>💬 پیغامات</h2><p>MESSAGE HISTORY</p></div>
+    <div class="tb-right">
+      <div class="dbadge" id="msgCount">— پیغامات</div>
+      <button class="btn btn-g" onclick="loadMessages()">🔄 ریفریش</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>فون</th><th>قسم</th><th>پیغام</th><th>جواب</th><th>وقت</th>
+        </tr></thead>
+        <tbody id="messagesTable"><tr><td colspan="5"><div class="loading">لوڈ ہو رہا ہے<div class="spin"></div></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MARKET ═══════════════════════════════════ -->
+<div class="section" id="sec-market">
+  <div class="topbar">
+    <div class="page-h"><h2>📊 منڈی ریٹ</h2><p>MANDI PRICES — LIVE</p></div>
+    <div class="tb-right">
+      <button class="btn btn-g" onclick="loadMarket()">🔄 ریفریش</button>
+    </div>
+  </div>
+  <div class="card" id="marketRates"><div class="loading">لوڈ ہو رہا ہے<div class="spin"></div></div></div>
+</div>
+
+<!-- ══ BROADCAST ════════════════════════════════ -->
+<div class="section" id="sec-broadcast">
+  <div class="topbar">
+    <div class="page-h"><h2>📣 براڈکاسٹ پیغام</h2><p>SEND TO FARMERS</p></div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-h"><h3>📝 پیغام لکھیں</h3></div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;gap:10px">
+          <select id="bc-region" style="flex:1;background:rgba(7,26,7,.8);border:1px solid var(--border);padding:8px;border-radius:6px;color:var(--txt);font-size:.8em">
+            <option value="all">تمام علاقے</option>
+            <option value="KPK">KPK</option>
+            <option value="Punjab">پنجاب</option>
+            <option value="Sindh">سندھ</option>
+          </select>
+          <select id="bc-crop" style="flex:1;background:rgba(7,26,7,.8);border:1px solid var(--border);padding:8px;border-radius:6px;color:var(--txt);font-size:.8em">
+            <option value="all">تمام فصلیں</option>
+            <option value="گندم">گندم</option>
+            <option value="مکئی">مکئی</option>
+            <option value="کپاس">کپاس</option>
+          </select>
+        </div>
+        <textarea id="bc-msg" style="width:100%;background:rgba(7,26,7,.8);border:1px solid var(--border);padding:10px;border-radius:6px;color:var(--txt);font-family:'Noto Nastaliq Urdu';font-size:.85em;resize:vertical;min-height:120px" placeholder="پیغام لکھیں...">🌾 کسان پکار AI:
+آج موسم صاف ہے۔ فصل کی دیکھ بھال کریں۔
+کسی مسئلے کے لیے لکھیں۔</textarea>
+        <button class="btn btn-p" style="width:100%;justify-content:center;padding:12px" onclick="sendBroadcast()">📣 پیغام بھیجیں</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>👁️ پیش نظارہ</h3></div>
+      <div style="background:rgba(46,204,64,.04);border:1px solid var(--border);border-radius:10px;padding:14px">
+        <div id="bc-preview" style="font-family:'Noto Nastaliq Urdu',serif;font-size:.85em;color:var(--txt);white-space:pre-wrap;min-height:100px">پیغام یہاں نظر آئے گا...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ COMPANIES ══════════════════════════════ -->
+<div class="section" id="sec-companies">
+  <div class="topbar">
+    <div class="page-h"><h2>🏭 کمپنیاں</h2><p>FERTILIZER & AGRI PARTNERS</p></div>
+    <div class="tb-right">
+      <button class="btn btn-p" onclick="toggleAddCompany()">+ نئی کمپنی</button>
+      <button class="btn btn-g" onclick="loadCompanies()">🔄 ریفریش</button>
+    </div>
+  </div>
+  <div id="companiesGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px">
+    <div class="loading" style="grid-column:1/-1">لوڈ ہو رہا ہے<div class="spin"></div></div>
+  </div>
+</div>
+
+<!-- ══ HEALTH ════════════════════════════════ -->
+<div class="section" id="sec-health">
+  <div class="topbar">
+    <div class="page-h"><h2>⚡ سسٹم حالت</h2><p>SYSTEM HEALTH CHECK</p></div>
+    <div class="tb-right"><button class="btn btn-g" onclick="loadHealth()">🔄 چیک کریں</button></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px" id="healthGrid">
+    <div class="loading" style="grid-column:1/-1">لوڈ ہو رہا ہے<div class="spin"></div></div>
+  </div>
+</div>
+
+</main>
+
+<script>
+const BASE = window.location.origin;
+
+function showSection(name, el) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+  document.getElementById('sec-'+name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'farmers')   loadFarmers();
+  if (name === 'messages')  loadMessages();
+  if (name === 'market')    loadMarket();
+  if (name === 'companies') loadCompanies();
+  if (name === 'health')    loadHealth();
+}
+
+function animCount(id, target) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  let cur = 0, step = Math.max(1, Math.ceil(target/40));
+  const t = setInterval(() => {
+    cur = Math.min(cur+step, target);
+    el.textContent = cur.toLocaleString();
+    if(cur >= target) clearInterval(t);
+  }, 35);
+}
+
+async function loadAll() {
+  document.getElementById('topbar-date').textContent =
+    new Date().toLocaleDateString('ur-PK');
+  await loadStats();
+  buildTicker();
+}
+
+async function loadStats() {
+  try {
+    const r = await fetch(`${BASE}/api/stats`);
+    const d = await r.json();
+    animCount('k-total', d.total_users || 0);
+    animCount('k-reg',   d.registered_users || 0);
+    animCount('k-msg',   d.total_messages || 0);
+    animCount('k-img',   d.message_types?.image || 0);
+    animCount('k-voice', d.message_types?.voice || 0);
+    document.getElementById('sysStatus').textContent = 'ONLINE';
+  } catch(e) {
+    document.getElementById('sysStatus').textContent = 'ERROR';
+  }
+}
+
+function buildTicker() {
+  const rates = [
+    {n:'گندم',  p:'₨4,050/من'},
+    {n:'ٹماٹر', p:'₨95/کلو'},
+    {n:'آلو',   p:'₨52/کلو'},
+    {n:'پیاز',  p:'₨68/کلو'},
+    {n:'مکئی',  p:'₨3,100/من'},
+  ];
+  const html = [...rates,...rates].map(r=>`
+    <span class="ti">
+      <span class="cn">${r.n}</span>
+      <span class="cp">${r.p}</span>
+    </span>`).join('');
+  document.getElementById('ticker').innerHTML = html;
+}
+
+async function loadFarmers() {
+  try {
+    const r = await fetch(`${BASE}/api/farmers`);
+    const d = await r.json();
+    document.getElementById('farmerCount').textContent = (d.total||0) + ' کسان';
+    document.getElementById('farmersTable').innerHTML = d.farmers?.length ?
+      d.farmers.map(f=>`
+        <tr>
+          <td style="color:var(--txt);font-family:'Noto Nastaliq Urdu'">${f.name}</td>
+          <td style="font-family:'Space Mono';font-size:.75em">${f.phone?.slice(0,4)}***${f.phone?.slice(-3)}</td>
+          <td>${f.region||'—'}</td>
+          <td>${f.crop||'—'}</td>
+          <td style="font-family:'Space Mono'">${f.acres||'—'}</td>
+          <td style="font-family:'Space Mono';font-size:.72em">${f.created_at?.slice(0,10)||'—'}</td>
+        </tr>`).join('') :
+      '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--txt3)">ابھی کوئی کسان نہیں</td></tr>';
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+async function loadMessages() {
+  try {
+    const r = await fetch(`${BASE}/api/messages`);
+    const d = await r.json();
+    document.getElementById('msgCount').textContent = (d.total||0) + ' پیغامات';
+    document.getElementById('messagesTable').innerHTML = d.messages?.length ?
+      d.messages.map(m=>`
+        <tr>
+          <td style="font-family:'Space Mono';font-size:.75em">${m.phone?.slice(0,4)}***${m.phone?.slice(-3)}</td>
+          <td>${m.type}</td>
+          <td style="font-family:'Noto Nastaliq Urdu'">${m.user_msg?.slice(0,50)}</td>
+          <td style="font-family:'Noto Nastaliq Urdu'">${m.bot_reply?.slice(0,50)}</td>
+          <td style="font-family:'Space Mono';font-size:.7em">${m.created_at?.slice(0,16)}</td>
+        </tr>`).join('') :
+      '<tr><td colspan="5">ابھی کوئی پیغام نہیں</td></tr>';
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+async function loadMarket() {
+  try {
+    const r = await fetch(`${BASE}/api/market-rates`);
+    const d = await r.json();
+    let html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">';
+    Object.entries(d.rates||{}).forEach(([cat,items]) => {
+      html += `<div class="card"><h4 style="color:var(--acc);margin-bottom:10px">${cat}</h4><div style="font-size:.8em">`;
+      items.forEach(i => {
+        html += `<div style="padding:6px 0;border-bottom:1px solid var(--border)">${i.name}: <b>₨${i.min}-${i.max}</b>/${i.unit}</div>`;
+      });
+      html += '</div></div>';
+    });
+    html += '</div>';
+    document.getElementById('marketRates').innerHTML = html;
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+function toggleAddCompany() {
+  alert('Airtable سے Companies manage کریں یا آپ کا admin پینل اپڈیٹ کریں');
+}
+
+async function loadCompanies() {
+  try {
+    const r = await fetch(`${BASE}/api/companies`);
+    const d = await r.json();
+    document.getElementById('companiesGrid').innerHTML = d.companies?.length ?
+      d.companies.map(c=>`
+        <div class="card">
+          <div style="color:var(--acc);font-weight:600;margin-bottom:8px">${c.name}</div>
+          <div style="font-size:.8em;color:var(--txt2)">
+            <div>قسم: ${c.type}</div>
+            <div>رابطہ: ${c.contact}</div>
+            <div>علاقہ: ${c.region}</div>
+          </div>
+        </div>`).join('') :
+      '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--txt3)">ابھی کوئی کمپنی نہیں</div>';
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+async function loadHealth() {
+  try {
+    const r = await fetch(`${BASE}/api/health`);
+    const d = await r.json();
+    const labels = {api:'FastAPI',airtable:'Airtable',openai:'OpenAI',gemini:'Gemini',twilio:'Twilio',weather:'Weather'};
+    const checks = d.checks || {};
+    document.getElementById('healthGrid').innerHTML =
+      Object.entries(labels).map(([k,label])=>`
+        <div class="card" style="text-align:center">
+          <div style="font-size:1.5em;margin-bottom:8px">${k==='api'?'⚡':k==='airtable'?'🗄️':k==='openai'?'🤖':k==='gemini'?'🌟':k==='twilio'?'📱':'🌤️'}</div>
+          <div style="font-family:'Noto Nastaliq Urdu';font-size:.9em">${label}</div>
+          <div style="color:${checks[k]?'var(--acc)':'var(--red)'};font-weight:700;margin-top:4px">
+            ${checks[k]?'✅ آن لائن':'❌ آف لائن'}
+          </div>
+        </div>`).join('');
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+function updatePreview() {
+  document.getElementById('bc-preview').textContent = document.getElementById('bc-msg').value;
+}
+
+async function sendBroadcast() {
+  const msg = document.getElementById('bc-msg').value.trim();
+  const region = document.getElementById('bc-region').value;
+  if(!msg) { alert('پیغام لکھیں'); return; }
+  try {
+    const r = await fetch(`${BASE}/api/broadcast`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({message: msg, region})
+    });
+    const d = await r.json();
+    alert(d.message || 'بھیج دیا گیا');
+  } catch(e) {
+    alert('خرابی: ' + e.message);
+  }
+}
+
+window.addEventListener('load', () => {
+  loadAll();
+  updatePreview();
+  setInterval(loadAll, 60000);
+});
+</script>
+</body>
+</html>

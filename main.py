@@ -45,13 +45,21 @@ async def webhook(
     phone    = From.replace("whatsapp:", "")
     reply    = ""
     msg_type = "text"
+    
+    print(f"[WEBHOOK] Received from {phone}: {Body}")
+    
     try:
         if not database.is_registered(phone):
+            print(f"[REG] User {phone} not registered, handling registration...")
             reg_reply = await registration.handle_registration(Body, phone)
             if reg_reply:
+                print(f"[REG] Sending welcome message")
                 database.save_message(phone, "text", Body, reg_reply)
                 send_whatsapp(phone, reg_reply)
+                print(f"[REG] Message sent successfully")
                 return JSONResponse(content={"status": "ok"})
+            else:
+                print(f"[REG] reg_reply is None, continuing to chat...")
 
         if MediaUrl0 and MediaContentType0 and "image" in MediaContentType0:
             msg_type = "image"
@@ -65,12 +73,50 @@ async def webhook(
             name   = user.get("fields", {}).get("Name", "") if user else ""
             reply  = await ai_engine.chat_urdu(Body, phone, name)
     except Exception as e:
+        import traceback
         reply = "🌾 *کسان پکار AI*\n\nمعذرت، کوئی مسئلہ آ گیا۔ دوبارہ کوشش کریں۔"
-        print(f"Webhook error: {e}")
+        print(f"[ERROR] Webhook error: {e}")
+        print(traceback.format_exc())
 
-    database.save_message(phone, msg_type, Body or "media", reply)
-    send_whatsapp(phone, reply)
+    if reply:
+        print(f"[SEND] Sending to {phone}: {reply[:50]}...")
+        database.save_message(phone, msg_type, Body or "media", reply)
+        send_whatsapp(phone, reply)
+    else:
+        print(f"[WARN] No reply to send")
+    
     return JSONResponse(content={"status": "ok"})
+
+
+# ══════════════════════════════════════════════
+# TEST WEBHOOK (for debugging)
+# ══════════════════════════════════════════════
+
+@app.get("/test-webhook/{phone}/{message}")
+async def test_webhook(phone: str, message: str):
+    """Test endpoint to bypass Twilio and test bot directly"""
+    print(f"\n[TEST] Testing webhook with phone={phone}, message={message}")
+    
+    reply = ""
+    try:
+        if not database.is_registered(phone):
+            print(f"[TEST-REG] User {phone} not registered")
+            reg_reply = await registration.handle_registration(message, phone)
+            if reg_reply:
+                print(f"[TEST-REG] Got registration reply")
+                database.save_message(phone, "text", message, reg_reply)
+                return JSONResponse(content={"reply": reg_reply, "type": "registration"})
+        
+        user = database.get_user(phone)
+        name = user.get("fields", {}).get("Name", "") if user else ""
+        reply = await ai_engine.chat_urdu(message, phone, name)
+        database.save_message(phone, "text", message, reply)
+        return JSONResponse(content={"reply": reply, "type": "chat"})
+    except Exception as e:
+        import traceback
+        print(f"[TEST-ERROR] {e}")
+        print(traceback.format_exc())
+        return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
 # ══════════════════════════════════════════════

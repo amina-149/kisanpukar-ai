@@ -2,7 +2,7 @@ import os, httpx, base64, tempfile, json
 from openai import OpenAI
 from dotenv import load_dotenv
 from datetime import datetime
-import google.generativeai as genai
+import google.genai as genai
 import market
 
 load_dotenv()
@@ -10,7 +10,7 @@ load_dotenv()
 # ── API Clients ───────────────────────────────────────────
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-gemini = genai.GenerativeModel("gemini-1.5-flash")
+client = genai.Client()
 
 # ── Master System Prompt ──────────────────────────────────
 SYSTEM_PROMPT = """آپ کسان پکار AI ہیں — پاکستانی کسانوں کے سچے ڈیجیٹل زرعی ماہر۔
@@ -73,7 +73,10 @@ async def chat_urdu(message: str, phone: str, name: str = "") -> str:
 - خود ماہر بن کر جواب دیں"""
 
     try:
-        response = gemini.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt
+        )
         reply = response.text
         if not reply.startswith("🌾"):
             reply = "🌾 " + reply
